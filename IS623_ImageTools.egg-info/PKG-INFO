@@ -1,3 +1,22 @@
+Metadata-Version: 2.2
+Name: IS623_ImageTools
+Version: 1.0.0
+Summary: A simple library for image processing and visualization for the IS623 - Computación Gráfica course at Universidad Tecnológica de Pereira (UTP), developed by Kevin Esguerra Cardona.
+Home-page: https://github.com/porgetit/IS623-ImageTools.git
+Author: Kevin Esguerra Cardona
+Author-email: kevin.esguerra@utp.edu.co
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: Pillow
+Dynamic: author
+Dynamic: author-email
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary
+
 # IS623_ImageTools
 
 **IS623_ImageTools** es una librería sencilla para el procesamiento y la visualización de imágenes, desarrollada en el marco del curso **IS623 - Computación Gráfica** impartido por el Profesor Francisco Alejandro Medina Aguirre en la Universidad Tecnológica de Pereira (UTP), Colombia. La librería fue creada por **Kevin Esguerra Cardona** con el objetivo de facilitar el aprendizaje de conceptos básicos del procesamiento digital de imágenes, el paradigma de la programación orientada a objetos y el manejo de paquetes en Python según los estándares PEP 609.
