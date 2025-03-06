@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='IS623-ImageTools',
     version='1.0.0',
-    packages=['utilities_for_graphical_computing'],
+    packages=['IS623-ImageTools'],
     description="A simple library for image processing and visualization for the IS623 - Computación Gráfica course at Universidad Tecnológica de Pereira (UTP), developed by Kevin Esguerra Cardona.",
     long_description=open('README.md', encoding='utf-8').read(),
     long_description_content_type='text/markdown',
