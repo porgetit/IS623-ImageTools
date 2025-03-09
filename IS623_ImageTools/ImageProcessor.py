@@ -24,6 +24,9 @@ class Imagen:
     Permite el encadenamiento de métodos para realizar transformaciones de forma fluida.
     """
     datos: np.ndarray
+    
+    def copy(self):
+        return Imagen(self.datos.copy())
 
     @classmethod
     def desde_archivo(cls, ruta: str) -> 'Imagen':
@@ -37,10 +40,10 @@ class Imagen:
             Imagen: Instancia de Imagen.
         """
         try:
-            img = Image.open(ruta).convert("RGB")
+            img_file = Image.open(ruta).convert("RGB")
         except Exception as e:
             raise ValueError(f"Error al cargar la imagen desde {ruta}: {e}")
-        datos = np.array(img)
+        datos = np.array(img_file)
         return cls(datos)
 
     def normalizar(self) -> 'Imagen':
@@ -73,7 +76,7 @@ class Imagen:
         self.datos = 1 - self.datos
         return self
 
-    def colorear_pixel(self, row: int, col: int, color: list[int]) -> 'Imagen':
+    def colorear_pixel(self, row: int, col: int, color: list[int]) -> 'Imagen':  # TODO - Refactorizar este método para que sea más útil
         """
         Colorea un píxel específico de la imagen.
 
@@ -111,8 +114,14 @@ class Imagen:
         """
         if self.datos.shape[2] != 3:
             raise ValueError("La imagen debe tener 3 canales")
-        if not (0 <= indice <= 2):
+        
+        if isinstance(indice, slice):
+            indices = range(*indice.indices(3))
+            if not all(0 <= i <= 2 for i in indices):
+                raise ValueError("Todos los índices en el slice deben estar entre 0 y 2")
+        elif not (0 <= indice <= 2):
             raise ValueError("El índice debe estar entre 0 y 2")
+        
         capa = np.zeros_like(self.datos)
         capa[:, :, indice] = self.datos[:, :, indice]
         return Imagen(capa)
@@ -151,9 +160,9 @@ class Imagen:
             pass
         return Imagen(capa)
 
-    def mean_filter(self, kernel_size: int = 3) -> 'Imagen':
+    def geometric_mean_filter(self, kernel_size: int = 3) -> 'Imagen':
         """
-        Aplica un filtro de promedio a la imagen.
+        Aplica un filtro de media geométrica a la imagen.
 
         Parámetros:
             kernel_size (int): Tamaño del kernel (debe ser impar).
@@ -166,13 +175,18 @@ class Imagen:
         """
         if kernel_size % 2 == 0:
             raise ValueError("El tamaño del kernel debe ser impar")
+        
         pad_size = kernel_size // 2
         datos_padded = np.pad(self.datos, ((pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode="reflect")
         filtered = np.zeros_like(self.datos)
-        for i in range(self.datos.shape[0]):
-            for j in range(self.datos.shape[1]):
-                for k in range(self.datos.shape[2]):
-                    filtered[i, j, k] = np.mean(datos_padded[i:i + kernel_size, j:j + kernel_size, k])
+        
+        for k in range(self.datos.shape[2]):
+            for i in range(self.datos.shape[0]):
+                for j in range(self.datos.shape[1]):
+                    window = datos_padded[i:i+kernel_size, j:j+kernel_size, k]
+                    product = np.prod(window)
+                    filtered[i, j, k] = product ** (1 / (kernel_size * kernel_size))
+        
         self.datos = filtered
         return self
 
@@ -224,11 +238,11 @@ class Imagen:
         gray_3ch = np.stack((gray, gray, gray), axis=-1)
         return Imagen(gray_3ch)
 
-    def ajustar(self, factor: float) -> 'Imagen':
+    def ajustar_contraste(self, factor: float) -> 'Imagen':
         """
         Ajusta la imagen aplicando un filtro basado en el factor:
-          - factor < 0: Realza el contraste.
-          - factor > 0: Realza la intensidad.
+          - factor < 0: Realza el contraste en oscuros.
+          - factor > 0: Realza el contraste en claros.
           - factor == 0: No se aplica transformación.
 
         Parámetros:
@@ -281,6 +295,171 @@ class Imagen:
         for img, factor in imagenes:
             datos_fusion += img.datos * factor
         return Imagen(datos_fusion)
+    
+    def ajuste_brillo(self, factor: float) -> 'Imagen':
+        """
+        Ajusta el brillo de la imagen multiplicando los datos de la imagen por un factor dado.
+
+        Args:
+            factor (float): El factor de ajuste de brillo. Debe estar entre -1 y 1.
+
+        Returns:
+            Imagen: Una nueva instancia de la imagen con el brillo ajustado.
+
+        Raises:
+            ValueError: Si el factor está fuera del rango permitido (-1 a 1).
+        """
+        if abs(factor) > 1:
+            raise ValueError("El factor de ajuste de brillo debe estar entre -1 y 1")
+        
+        if np.any(self.datos < -1) or np.any(self.datos > 1):
+            self.normalizar()
+        
+        self.datos = self.datos + factor
+        return self
+
+    # ================== EJERCICIO 2: Adjust Channel Brightness ==================
+    def adjust_channel_brightness(self, channel: int, factor: float) -> 'Imagen':
+        """
+        Ajusta el brillo de un canal específico de la imagen.
+
+        Parámetros:
+            channel (int): Índice del canal a ajustar.
+            factor (float): Factor de ajuste (entre -1 y 1).
+
+        Retorna:
+            Imagen: La imagen con el brillo ajustado en el canal especificado.
+        """
+        if abs(factor) > 1:
+            raise ValueError("El factor de ajuste de brillo debe estar entre -1 y 1")
+        if channel < 0 or channel >= self.datos.shape[2]:
+            raise ValueError("El índice de canal es inválido")
+        if np.any(self.datos < -1) or np.any(self.datos > 1):
+            self.normalizar()
+        self.datos[:, :, channel] = self.datos[:, :, channel] + factor
+        return self
+
+    # ================== EJERCICIO 4: Zoom ==================
+    def zoom(self, left: int, top: int, right: int, bottom: int) -> 'Imagen':
+        """
+        Realiza un zoom en la imagen sobre la región especificada.
+
+        Parámetros:
+            left (int): Coordenada x inicial.
+            top (int): Coordenada y inicial.
+            right (int): Coordenada x final.
+            bottom (int): Coordenada y final.
+
+        Retorna:
+            Imagen: La imagen resultante del zoom.
+        """
+        if left < 0 or top < 0 or right > self.datos.shape[1] or bottom > self.datos.shape[0]:
+            raise ValueError("Coordenadas fuera de rango")
+        # Extraer la región de interés
+        cropped = self.datos[top:bottom, left:right, :]
+        # Determinar si la imagen está normalizada para convertir apropiadamente
+        if self.datos.max() <= 1:
+            pil_img = Image.fromarray((cropped * 255).astype(np.uint8))
+        else:
+            pil_img = Image.fromarray(cropped)
+        # Redimensionar la región al tamaño original de la imagen
+        resized = pil_img.resize((self.datos.shape[1], self.datos.shape[0]), Image.BILINEAR)
+        resized_arr = np.array(resized)
+        # Si la imagen original estaba normalizada, reconvertir a rango [0,1]
+        if self.datos.max() <= 1:
+            resized_arr = resized_arr.astype(np.float32) / 255.0
+        self.datos = resized_arr
+        return self
+
+    # ================== EJERCICIO 5: Binarize ==================
+    def binarize(self, threshold: float = 0.5) -> 'Imagen':
+        """
+        Binariza la imagen aplicando un umbral.
+
+        Parámetros:
+            threshold (float): Umbral de binarización (entre 0 y 1).
+
+        Retorna:
+            Imagen: Imagen binarizada (3 canales).
+        """
+        if self.datos.max() > 1:
+            self.normalizar()
+        # Convertir a escala de grises usando el promedio
+        gray = np.mean(self.datos, axis=2)
+        binary = (gray > threshold).astype(np.float32)
+        binary_3ch = np.stack((binary, binary, binary), axis=-1)
+        self.datos = binary_3ch
+        return self
+
+    # ================== EJERCICIO 6: Rotate ==================
+    def rotate(self, angle: float, expand: bool = True) -> 'Imagen':
+        """
+        Rota la imagen un ángulo dado en grados utilizando solo numpy.
+
+        Parámetros:
+            angle (float): Ángulo de rotación en grados.
+            expand (bool): Si se debe expandir la imagen para ajustar el tamaño (por defecto True).
+
+        Retorna:
+            Imagen: Imagen rotada.
+        """
+        theta = np.radians(angle)
+        cos_t, sin_t = np.cos(theta), np.sin(theta)
+        
+        # Obtener dimensiones originales
+        h, w = self.datos.shape[:2]
+        
+        # Centro de la imagen
+        cx, cy = w / 2, h / 2
+        
+        # Calcular dimensiones de la nueva imagen si expand=True
+        if expand:
+            new_w = int(abs(w * cos_t) + abs(h * sin_t))
+            new_h = int(abs(w * sin_t) + abs(h * cos_t))
+        else:
+            new_w, new_h = w, h
+        
+        new_cx, new_cy = new_w / 2, new_h / 2
+        
+        # Crear imagen de salida (rellena con ceros, fondo negro)
+        if self.datos.ndim == 3:  # Imagen RGB
+            rotated_arr = np.zeros((new_h, new_w, self.datos.shape[2]), dtype=self.datos.dtype)
+        else:  # Imagen en escala de grises
+            rotated_arr = np.zeros((new_h, new_w), dtype=self.datos.dtype)
+        
+        # Iterar sobre cada píxel de la nueva imagen
+        for y_new in range(new_h):
+            for x_new in range(new_w):
+                # Transformar coordenadas inversamente (nueva -> original)
+                x_old = (x_new - new_cx) * cos_t + (y_new - new_cy) * sin_t + cx
+                y_old = -(x_new - new_cx) * sin_t + (y_new - new_cy) * cos_t + cy
+                
+                # Si las coordenadas están dentro de los límites, asignar el valor
+                if 0 <= x_old < w and 0 <= y_old < h:
+                    rotated_arr[y_new, x_new] = self.datos[int(y_old), int(x_old)]
+        
+        return Imagen(rotated_arr)
+
+
+    # ================== EJERCICIO 7: Show Histogram ==================
+    def show_histogram(self) -> None:
+        """
+        Muestra el histograma de cada una de las capas de la imagen.
+        """
+        import matplotlib.pyplot as plt
+        channels = self.datos.shape[2]
+        fig, axs = plt.subplots(1, channels, figsize=(5 * channels, 4))
+        # Si es solo una capa, convertir a lista para iterar
+        if channels == 1:
+            axs = [axs]
+        for i in range(channels):
+            channel_data = self.datos[:, :, i]
+            axs[i].hist(channel_data.ravel(), bins=256, color='gray', alpha=0.7)
+            axs[i].set_title(f'Histograma de la capa {i}')
+            axs[i].set_xlabel('Intensidad')
+            axs[i].set_ylabel('Frecuencia')
+        plt.tight_layout()
+        plt.show()
 
 
 class ColorConverter:
@@ -372,7 +551,7 @@ class FiltroIdentity(FiltroStrategy):
         return Imagen(imagen.datos.copy())
 
 
-class FiltroContraste(FiltroStrategy):
+class FiltroContrasteOscuros(FiltroStrategy):
     """
     Filtro para realzar el contraste utilizando transformación logarítmica.
 
@@ -398,7 +577,7 @@ class FiltroContraste(FiltroStrategy):
         return imagen
 
 
-class FiltroIntensidad(FiltroStrategy):
+class FiltroContrasteClaros(FiltroStrategy):
     """
     Filtro para realzar la intensidad utilizando transformación exponencial.
 
@@ -446,8 +625,8 @@ class FiltroFactory:
         if factor == 0:
             return FiltroIdentity()
         elif factor < 0:
-            return FiltroContraste(factor)
+            return FiltroContrasteOscuros(factor)
         elif factor > 0:
-            return FiltroIntensidad(factor)
+            return FiltroContrasteClaros(factor)
         else:
             raise ValueError("Factor no reconocido para el filtrado")

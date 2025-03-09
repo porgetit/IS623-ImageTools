@@ -8,9 +8,11 @@ from .ImageProcessor import (
     FiltroIdentity,
 )
 
+from .VideoTools import Video
 from .SimpleImageViewer import SimpleImageViewer
 
 __all__ = [
+    "Video",
     "Imagen",
     "ColorConverter",
     "FiltroFactory",
